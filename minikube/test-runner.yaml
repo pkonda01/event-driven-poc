@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: api-tests
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: api-test-runner
+  namespace: api-tests
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: test-runner
+        image: python:3.9-slim
+        command: ["/bin/bash"]
+        args:
+        - -c
+        - |
+          pip install requests azure-servicebus
+          cd /tests
+          python api_tests.py
+        env:
+        - name: SERVICE_BUS_CONNECTION_STRING
+          valueFrom:
+            secretKeyRef:
+              name: azure-secrets
+              key: service-bus-connection-string
+        - name: TEST_ENVIRONMENT
+          value: "minikube"
+        - name: GITHUB_SHA
+          value: "minikube-test"
+        - name: GITHUB_REF
+          value: "refs/heads/main"
+        volumeMounts:
+        - name: test-files
+          mountPath: /tests
+        - name: config-volume
+          mountPath: /tests/tests
+      volumes:
+      - name: test-files
+        configMap:
+          name: test-files
+      - name: config-volume
+        configMap:
+          name: test-config

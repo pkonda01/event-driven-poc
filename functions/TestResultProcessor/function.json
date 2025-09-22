@@ -1,0 +1,13 @@
+{
+  "scriptFile": "__init__.py",
+  "bindings": [
+    {
+      "name": "msg",
+      "type": "serviceBusTrigger",
+      "direction": "in",
+      "topicName": "api-test-results",
+      "subscriptionName": "processor",
+      "connection": "ServiceBusConnectionString"
+    }
+  ]
+}

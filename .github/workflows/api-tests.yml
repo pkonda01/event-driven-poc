@@ -1,0 +1,120 @@
+name: API Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  TEST_ENVIRONMENT: github-actions
+
+jobs:
+  run-api-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install dependencies
+      run: |
+        pip install -r tests/requirements.txt
+    
+    - name: Setup Minikube
+      uses: medyagh/setup-minikube@master
+      with:
+        minikube-version: 1.32.0
+        kubernetes-version: 1.28.0
+    
+    - name: Create Kubernetes namespace and secrets
+      run: |
+        kubectl create namespace api-tests --dry-run=client -o yaml | kubectl apply -f -
+        kubectl create secret generic azure-secrets \
+          --from-literal=service-bus-connection-string="${{ secrets.SERVICE_BUS_CONNECTION_STRING }}" \
+          --namespace=api-tests \
+          --dry-run=client -o yaml | kubectl apply -f -
+    
+    - name: Create test ConfigMap
+      run: |
+        kubectl create configmap test-files \
+          --from-file=tests/api_tests.py \
+          --namespace=api-tests \
+          --dry-run=client -o yaml | kubectl apply -f -
+    
+    - name: Deploy test configuration
+      run: |
+        kubectl apply -f k8s/configmap.yaml
+    
+    - name: Run API tests locally (for immediate feedback)
+      env:
+        SERVICE_BUS_CONNECTION_STRING: ${{ secrets.SERVICE_BUS_CONNECTION_STRING }}
+        GITHUB_SHA: ${{ github.sha }}
+        GITHUB_REF: ${{ github.ref }}
+        GITHUB_RUN_ID: ${{ github.run_id }}
+      run: |
+        cd tests
+        python api_tests.py
+    
+    - name: Run tests in Minikube (for validation)
+      run: |
+        # Update the job with current git info
+        sed -i 's/GITHUB_SHA.*/GITHUB_SHA\n          value: "${{ github.sha }}"/' k8s/test-runner.yaml
+        sed -i 's/GITHUB_REF.*/GITHUB_REF\n          value: "${{ github.ref }}"/' k8s/test-runner.yaml
+        
+        # Deploy and run
+        kubectl apply -f k8s/test-runner.yaml
+        
+        # Wait for job completion (with timeout)
+        kubectl wait --for=condition=complete job/api-test-runner -n api-tests --timeout=300s || true
+        
+        # Show logs
+        kubectl logs job/api-test-runner -n api-tests
+    
+    - name: Upload test artifacts
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: api-test-results
+        path: |
+          tests/*.log
+          tests/*.json
+        retention-days: 30
+    
+    - name: Clean up Minikube job
+      if: always()
+      run: |
+        kubectl delete job api-test-runner -n api-tests --ignore-not-found=true
+
+  deploy-infrastructure:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: run-api-tests
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    
+    - name: Deploy Azure infrastructure
+      run: |
+        az group create --name rg-api-tests-dev --location eastus2
+        
+        az deployment group create \
+          --resource-group rg-api-tests-dev \
+          --template-file infrastructure/main.bicep \
+          --parameters environmentName=dev
+    
+    - name: Deploy Azure Function
+      run: |
+        cd functions
+        func azure functionapp publish ${{ secrets.FUNCTION_APP_NAME }} --python
