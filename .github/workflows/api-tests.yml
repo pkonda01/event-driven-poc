@@ -49,7 +49,7 @@ jobs:
     
     - name: Deploy test configuration
       run: |
-        kubectl apply -f k8s/configmap.yaml
+        kubectl apply -f minikube/configmap.yaml
     
     - name: Run API tests locally (for immediate feedback)
       env:
@@ -64,11 +64,11 @@ jobs:
     - name: Run tests in Minikube (for validation)
       run: |
         # Update the job with current git info
-        sed -i 's/GITHUB_SHA.*/GITHUB_SHA\n          value: "${{ github.sha }}"/' k8s/test-runner.yaml
-        sed -i 's/GITHUB_REF.*/GITHUB_REF\n          value: "${{ github.ref }}"/' k8s/test-runner.yaml
+        sed -i 's/GITHUB_SHA.*/GITHUB_SHA\n          value: "${{ github.sha }}"/' minikube/test-runner.yaml
+        sed -i 's/GITHUB_REF.*/GITHUB_REF\n          value: "${{ github.ref }}"/' minikube/test-runner.yaml
         
         # Deploy and run
-        kubectl apply -f k8s/test-runner.yaml
+        kubectl apply -f minikube/test-runner.yaml
         
         # Wait for job completion (with timeout)
         kubectl wait --for=condition=complete job/api-test-runner -n api-tests --timeout=300s || true
