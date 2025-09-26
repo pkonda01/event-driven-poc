@@ -40,16 +40,17 @@ jobs:
           --namespace=api-tests \
           --dry-run=client -o yaml | kubectl apply -f -
     
-    - name: Create test ConfigMap
+    - name: Create test ConfigMaps
       run: |
         kubectl create configmap test-files \
           --from-file=tests/api_tests.py \
           --namespace=api-tests \
           --dry-run=client -o yaml | kubectl apply -f -
-    
-    - name: Deploy test configuration
-      run: |
-        kubectl apply -f minikube/configmap.yaml
+        
+        kubectl create configmap test-config \
+          --from-file=tests/test_config.json \
+          --namespace=api-tests \
+          --dry-run=client -o yaml | kubectl apply -f -
     
     - name: Run API tests locally (for immediate feedback)
       env:
@@ -63,18 +64,24 @@ jobs:
     
     - name: Run tests in Minikube (for validation)
       run: |
-        # Update the job with current git info
-        sed -i 's/GITHUB_SHA.*/GITHUB_SHA\n          value: "${{ github.sha }}"/' minikube/test-runner.yaml
-        sed -i 's/GITHUB_REF.*/GITHUB_REF\n          value: "${{ github.ref }}"/' minikube/test-runner.yaml
+        # Create a temporary copy of the test-runner.yaml with substitutions
+        cp minikube/test-runner.yaml minikube/test-runner-temp.yaml
+        
+        # Use different delimiter (|) to avoid issues with forward slashes
+        sed -i 's|GITHUB_SHA.*|GITHUB_SHA\n          value: "${{ github.sha }}"|' minikube/test-runner-temp.yaml
+        sed -i 's|GITHUB_REF.*|GITHUB_REF\n          value: "${{ github.ref }}"|' minikube/test-runner-temp.yaml
         
         # Deploy and run
-        kubectl apply -f minikube/test-runner.yaml
+        kubectl apply -f minikube/test-runner-temp.yaml
         
         # Wait for job completion (with timeout)
         kubectl wait --for=condition=complete job/api-test-runner -n api-tests --timeout=300s || true
         
         # Show logs
         kubectl logs job/api-test-runner -n api-tests
+        
+        # Clean up temporary file
+        rm minikube/test-runner-temp.yaml
     
     - name: Upload test artifacts
       if: always()
