@@ -1,13 +1,14 @@
 param location string = resourceGroup().location
 param environmentName string = 'dev'
+param projectName string = 'apitest'
 
 var uniqueSuffix = uniqueString(resourceGroup().id)
-var serviceBusNamespace = 'sb-apitests-${environmentName}-${uniqueSuffix}'
-var functionAppName = 'func-apitests-${environmentName}-${uniqueSuffix}'
-var storageAccountName = 'stapitests${environmentName}${uniqueSuffix}'
-var appInsightsName = 'ai-apitests-${environmentName}-${uniqueSuffix}'
+var serviceBusNamespace = '${projectName}-sb-${environmentName}-${uniqueSuffix}'
+var functionAppName = '${projectName}-func-${environmentName}-${uniqueSuffix}'
+var storageAccountName = '${projectName}st${environmentName}${uniqueSuffix}'
+var appInsightsName = '${projectName}-ai-${environmentName}-${uniqueSuffix}'
 
-// Storage Account
+// Storage Account for Functions
 resource storageAccount 'Microsoft.Storage/storageAccounts@2022-09-01' = {
   name: storageAccountName
   location: location
@@ -15,6 +16,9 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2022-09-01' = {
     name: 'Standard_LRS'
   }
   kind: 'StorageV2'
+  properties: {
+    accessTier: 'Hot'
+  }
 }
 
 // Application Insights
@@ -28,7 +32,7 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
   }
 }
 
-// Service Bus
+// Service Bus Namespace and Topic
 module serviceBus 'servicebus.bicep' = {
   name: 'serviceBusDeployment'
   params: {
@@ -37,7 +41,7 @@ module serviceBus 'servicebus.bicep' = {
   }
 }
 
-// Function App
+// App Service Plan for Functions
 resource hostingPlan 'Microsoft.Web/serverfarms@2022-03-01' = {
   name: '${functionAppName}-plan'
   location: location
@@ -47,10 +51,17 @@ resource hostingPlan 'Microsoft.Web/serverfarms@2022-03-01' = {
   }
   kind: 'functionapp'
   properties: {
-    reserved: true
+    reserved: true // Linux
   }
 }
 
+// FIXED: Get connection string using resource reference
+resource serviceBusAuthRule 'Microsoft.ServiceBus/namespaces/authorizationRules@2022-10-01-preview' existing = {
+  name: '${serviceBusNamespace}/RootManageSharedAccessKey'
+  dependsOn: [serviceBus]
+}
+
+// Function App
 resource functionApp 'Microsoft.Web/sites@2022-03-01' = {
   name: functionAppName
   location: location
@@ -63,6 +74,14 @@ resource functionApp 'Microsoft.Web/sites@2022-03-01' = {
         {
           name: 'AzureWebJobsStorage'
           value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccount.listKeys().keys[0].value}'
+        }
+        {
+          name: 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING'
+          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccount.listKeys().keys[0].value}'
+        }
+        {
+          name: 'WEBSITE_CONTENTSHARE'
+          value: toLower(functionAppName)
         }
         {
           name: 'FUNCTIONS_EXTENSION_VERSION'
@@ -78,17 +97,24 @@ resource functionApp 'Microsoft.Web/sites@2022-03-01' = {
         }
         {
           name: 'ServiceBusConnectionString'
-          value: serviceBus.outputs.connectionString
+          value: serviceBusAuthRule.listKeys().primaryConnectionString
         }
         {
           name: 'SLACK_WEBHOOK_URL'
-          value: ''  // Set this manually after deployment
+          value: '' // Set this manually after deployment
         }
       ]
     }
   }
 }
 
-output serviceBusConnectionString string = serviceBus.outputs.connectionString
+// FIXED: Don't output secrets, output resource information instead
 output functionAppName string = functionApp.name
 output resourceGroupName string = resourceGroup().name
+output storageAccountName string = storageAccount.name
+output appInsightsName string = appInsights.name
+output serviceBusNamespace string = serviceBus.outputs.namespaceName
+output serviceBusResourceId string = serviceBus.outputs.serviceBusResourceId
+
+// To get the connection string after deployment, use Azure CLI:
+// az servicebus namespace authorization-rule keys list --resource-group rg-apitest-dev --namespace-name <namespace> --name RootManageSharedAccessKey --query primaryConnectionString -o tsv

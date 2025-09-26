@@ -15,6 +15,7 @@ spec:
       containers:
       - name: test-runner
         image: python:3.9-slim
+        imagePullPolicy: IfNotPresent  # Add this to use local image if available
         command: ["/bin/bash"]
         args:
         - -c
@@ -38,7 +39,7 @@ spec:
         - name: test-files
           mountPath: /tests
         - name: config-volume
-          mountPath: /tests/tests
+          mountPath: /config
       volumes:
       - name: test-files
         configMap:

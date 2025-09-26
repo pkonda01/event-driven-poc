@@ -1,0 +1,64 @@
+{
+  "test_suite_id": "test-20250923-140722-56fe5e96",
+  "timestamp": "2025-09-23T21:07:34.120692+00:00",
+  "total_tests": 4,
+  "passed_tests": 4,
+  "failed_tests": 0,
+  "success_rate": 100.0,
+  "total_duration_ms": 11738,
+  "environment": "local",
+  "git_commit": "unknown",
+  "git_branch": "unknown",
+  "github_run_id": "unknown",
+  "github_repository": "unknown",
+  "test_results": [
+    {
+      "test_name": "Health Check",
+      "test_id": "test-20250923-140722-56fe5e96",
+      "url": "https://httpbin.org/status/200",
+      "method": "GET",
+      "status": "passed",
+      "start_time": "2025-09-23T21:07:22.382206+00:00",
+      "duration_ms": 2664,
+      "error": null,
+      "response_status": 200,
+      "response_time_ms": 2664
+    },
+    {
+      "test_name": "JSON Response Test",
+      "test_id": "test-20250923-140722-56fe5e96",
+      "url": "https://httpbin.org/json",
+      "method": "GET",
+      "status": "passed",
+      "start_time": "2025-09-23T21:07:25.050354+00:00",
+      "duration_ms": 4060,
+      "error": null,
+      "response_status": 200,
+      "response_time_ms": 4060
+    },
+    {
+      "test_name": "POST Test",
+      "test_id": "test-20250923-140722-56fe5e96",
+      "url": "https://httpbin.org/post",
+      "method": "POST",
+      "status": "passed",
+      "start_time": "2025-09-23T21:07:29.113567+00:00",
+      "duration_ms": 632,
+      "error": null,
+      "response_status": 200,
+      "response_time_ms": 632
+    },
+    {
+      "test_name": "Delay Test",
+      "test_id": "test-20250923-140722-56fe5e96",
+      "url": "https://httpbin.org/delay/2",
+      "method": "GET",
+      "status": "passed",
+      "start_time": "2025-09-23T21:07:29.747567+00:00",
+      "duration_ms": 4370,
+      "error": null,
+      "response_status": 200,
+      "response_time_ms": 4370
+    }
+  ]
+}
