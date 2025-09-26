@@ -98,30 +98,30 @@ jobs:
       run: |
         kubectl delete job api-test-runner -n api-tests --ignore-not-found=true
 
-  deploy-infrastructure:
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: run-api-tests
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Azure Login
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
-    
-    - name: Deploy Azure infrastructure
-      run: |
-        az group create --name rg-api-tests-dev --location eastus2
-        
-        az deployment group create \
-          --resource-group rg-api-tests-dev \
-          --template-file infrastructure/main.bicep \
-          --parameters environmentName=dev
-    
-    - name: Deploy Azure Function
-      run: |
-        cd functions
-        func azure functionapp publish ${{ secrets.FUNCTION_APP_NAME }} --python
+  # deploy-infrastructure:
+  #   runs-on: ubuntu-latest
+  #   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+  #   needs: run-api-tests
+  #   
+  #   steps:
+  #   - name: Checkout code
+  #     uses: actions/checkout@v4
+  #   
+  #   - name: Azure Login
+  #     uses: azure/login@v1
+  #     with:
+  #       creds: ${{ secrets.AZURE_CREDENTIALS }}
+  #   
+  #   - name: Deploy Azure infrastructure
+  #     run: |
+  #       az group create --name rg-api-tests-dev --location eastus2
+  #       
+  #       az deployment group create \
+  #         --resource-group rg-api-tests-dev \
+  #         --template-file infrastructure/main.bicep \
+  #         --parameters environmentName=dev
+  #   
+  #   - name: Deploy Azure Function
+  #     run: |
+  #       cd functions
+  #       func azure functionapp publish ${{ secrets.FUNCTION_APP_NAME }} --python

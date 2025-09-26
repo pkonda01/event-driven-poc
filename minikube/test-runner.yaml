@@ -15,13 +15,17 @@ spec:
       containers:
       - name: test-runner
         image: python:3.9-slim
-        imagePullPolicy: IfNotPresent  # Add this to use local image if available
+        imagePullPolicy: IfNotPresent
         command: ["/bin/bash"]
         args:
         - -c
         - |
           pip install requests azure-servicebus
           cd /tests
+          # Create a writable directory for results
+          mkdir -p /tmp/results
+          # Set environment variable for writable location
+          export RESULTS_DIR=/tmp/results
           python api_tests.py
         env:
         - name: SERVICE_BUS_CONNECTION_STRING
@@ -30,11 +34,13 @@ spec:
               name: azure-secrets
               key: service-bus-connection-string
         - name: TEST_ENVIRONMENT
-          value: "minikube"
+          value: "kubernetes"
         - name: GITHUB_SHA
-          value: "minikube-test"
+          value: "minikube-test"  # This will be replaced by sed
         - name: GITHUB_REF
-          value: "refs/heads/main"
+          value: "refs/heads/main"  # This will be replaced by sed
+        - name: RESULTS_DIR
+          value: "/tmp/results"
         volumeMounts:
         - name: test-files
           mountPath: /tests
